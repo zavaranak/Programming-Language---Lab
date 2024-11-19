@@ -7,20 +7,20 @@ main
 lab1(текущая ветка)
 
 # REQUIRES:
-  ➕ Using asyn + sync primitives:
+  ## ➕ Using asyn + sync primitives:
     🟣 Using library asyncio (gather,run, sleep, async - await) ✅
-  ➕ Download file html:
+  ## ➕ Download file html:
     🟣 Download with URL (provide in command line as an arguement) ✅
     🟣 Save to current folder with original name. ✅
-  ➕ count taken bytes per second:
+  ## ➕ count taken bytes per second:
     🟣 Every second gives output of size of taken data. ✅
-  ➕ Base language:
+  ## ➕ Base language:
     🟣 Using Python ✅
-  ➕ Deadline:
+  ## ➕ Deadline:
     🟣 8 Jan 23:55 ✅
 
 # RECOMMENDATION:
-🟢 Using http.client (HTTPConnection,request, getResponse, close)✅
+  ## 🟢 Using http.client (HTTPConnection,request, getResponse, close)✅
 
 # RESULT:
 ## Запустить программу с коммандой "python dang.py"
