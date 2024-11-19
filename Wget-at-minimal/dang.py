@@ -9,14 +9,17 @@ download_finished = False
 filename = 'tempfile'
 
 def findTitle():
-    with open('tempfile', 'rb') as file:
-        content = file.read()
-    match = re.search(rb"<title>(.*?)</title>", content)
-    title = match.group(1).strip() if match else None
-    if (title==None): return None
-    firstParsedTitle = title.decode('utf-8', errors='ignore') if title else None
-    secondParsedTitle = handleTitleSyntax(firstParsedTitle)
-    return secondParsedTitle
+    try:
+        with open('tempfile', 'rb') as file:
+            content = file.read()
+        match = re.search(rb"<title>(.*?)</title>", content)
+        title = match.group(1).strip() if match else None
+        if (title==None): return None
+        firstParsedTitle = title.decode('utf-8', errors='ignore') if title else None
+        secondParsedTitle = handleTitleSyntax(firstParsedTitle)
+        return secondParsedTitle
+    except:
+        return None
 
 def handleTitleSyntax(title):
     invalid_chars = r'[<>:"/\\|?*]'
@@ -52,13 +55,13 @@ async def download_file(url):
         global total_bytes, download_finished
         parsedURL = parseURL(url) 
         if (parsedURL==None):
-            print('>>>MESSAGE: Invalid URL. Make sure you enter correct URL with http/https prefix')
+            print('MESSAGE: Invalid URL. Make sure you enter correct URL with http/https prefix')
         else:
             [httpConnnection,path] = parsedURL
             httpConnnection.request("GET", path) 
             response = httpConnnection.getresponse()
             if response.status == 200 and "text/html" in response.headers.get("Content-Type", ""):
-                print(">>>MESSAGE: Starting download...")
+                print("MESSAGE: Starting download...")
                 with open(filename, 'wb') as file:
                     original_name=None
                     buffer = bytearray(2048) #2MB per buffer reading
@@ -72,15 +75,17 @@ async def download_file(url):
                         file.write(buffer[:num_bytes_read])            
                         await asyncio.sleep(0)
 
-                original_name = findTitle()+'.html'
-                os.replace(filename, original_name)
-                print(f">>>MESSAGE: File downloaded successfully as {original_name} with total {total_bytes} bytes")
+                
+                original_name = findTitle()
+                title = original_name +'.html'  if original_name else 'untitile.html'
+                os.replace(filename, title)
+                print(f"MESSAGE: File downloaded successfully as '{title}', size: {total_bytes} bytes")
             else:
-                print(f">>>MESSAGE: Failed to download file. Status: {response.status} {response.reason}")
+                print(f"MESSAGE: Failed to download file. Status: {response.status} {response.reason}")
             httpConnnection.close()
             total_bytes = 0
     except:
-        print(f">>>MESSAGE: Failed to download file. Please check your URL")
+        print(f"MESSAGE: Failed to download file. Please check your URL")
     finally:
         download_finished = True
         return
@@ -102,7 +107,7 @@ async def interface():
             print(">RETURNING TO MENU:")
         elif command == "q":
             quit = True
-    print("Exiting the program.")
+    print(">Exiting the program.")
 
 if __name__ == "__main__":
     asyncio.run(interface())
