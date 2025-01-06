@@ -18,13 +18,18 @@ import (
 
 var clientName string
 
-var publicKey []byte
+var publicKey *[32]byte
 
-// var privateKey []byte
+var privateKey *[32]byte
 
-var userList = make(map[string]*[]byte)
+var contactBook = make(map[string]*[32]byte)
+
+// var publicKeyChan = make(chan *[32]byte, 1)
+// var publicKeyChan = make(chan struct{})
+var publicKeyChannels = make(map[string]chan struct{})
 
 func RunClient(host, port, username string) {
+	GenerateKeyPair()
 	clientName = username
 	address := fmt.Sprintf("%s:%s", host, port)
 	conn, err := net.Dial("tcp", address)
@@ -32,9 +37,11 @@ func RunClient(host, port, username string) {
 		log.Fatalf("Can not connect to server. Error: %v", err)
 	}
 	defer conn.Close()
+
 	log.Println("Connected to server: ", address)
-	publicKey = []byte("byte")
-	clientInfo := ClientInfo{username, publicKey}
+
+	//send client info to server
+	clientInfo := ClientInfo{username, *publicKey}
 	request, err := CreateRequest(Methods[2], clientInfo)
 	if err != nil {
 		log.Fatalf("Can not create first request to server. Error: %v", err)
@@ -49,6 +56,7 @@ func RunClient(host, port, username string) {
 }
 
 func receiveMessages(conn net.Conn) {
+
 	reader := bufio.NewReader(conn)
 	for {
 		message, err := reader.ReadString('\n')
@@ -63,40 +71,53 @@ func receiveMessages(conn net.Conn) {
 		_ = json.Unmarshal([]byte(message), &parsedMessage)
 
 		timeString := time.Unix(parsedMessage.Timestamp, 0).Format("15:04")
-
 		switch parsedMessage.MessageType {
 		case MessageTypes[0]: //client_online
 			contentToByte, _ := json.Marshal(parsedMessage.Content)
 			var parsedClient ClientInfo
 			_ = json.Unmarshal(contentToByte, &parsedClient)
-
-			userList[parsedClient.Username] = &parsedClient.PublicKey
+			setContact(parsedClient)
 			fmt.Printf("[%s]New client connected: %s(PUBLIC KEY: %v)\n", timeString, parsedClient.Username, parsedClient.PublicKey)
 
 		case MessageTypes[1]: //client_offline
 			contentToByte, _ := json.Marshal(parsedMessage.Content)
 			var parsedClient ClientInfo
 			_ = json.Unmarshal(contentToByte, &parsedClient)
-			delete(userList, parsedClient.Username)
+			delete(contactBook, parsedClient.Username)
 			fmt.Printf("[%s]Client disconnected: %s(PUBLIC KEY: %v)\n", timeString, parsedClient.Username, parsedClient.PublicKey)
 		case MessageTypes[2]: //send_broadcast
-			fmt.Printf("[%s][<<Public from %s]: %s", timeString, parsedMessage.Sender, parsedMessage.Content)
+			fmt.Printf("[%s][<<Public from %s]: %s\n", timeString, parsedMessage.Sender, parsedMessage.Content)
 		case MessageTypes[3]: //success_broadcast
-			fmt.Printf("[%s][>>Public]: %s", timeString, parsedMessage.Content)
+			fmt.Printf("[%s][>>Public]: %s\n", timeString, parsedMessage.Content)
 
 		case MessageTypes[4]: //send_private
-			fmt.Printf("[%s][<<Private from %s]: %s", timeString, parsedMessage.Sender, parsedMessage.Content)
+			contentToByte, _ := json.Marshal(parsedMessage.Content)
+			var encryptedMessage []byte
+			_ = json.Unmarshal(contentToByte, &encryptedMessage)
+			go DecryptContent(encryptedMessage, &parsedMessage.Nonce, parsedMessage.Sender, timeString, conn)
 
 		case MessageTypes[5]: //success_private
-			fmt.Printf("[%s][>>Private to %s]: %s", timeString, parsedMessage.Recipient, parsedMessage.Content)
-
+			contentToByte, _ := json.Marshal(parsedMessage.Content)
+			var encryptedMessage []byte
+			_ = json.Unmarshal(contentToByte, &encryptedMessage)
+			recipientPublicKey := contactBook[parsedMessage.Recipient]
+			decrypted, ok := box.Open(nil, encryptedMessage, &parsedMessage.Nonce, recipientPublicKey, privateKey)
+			if !ok {
+				continue
+			}
+			fmt.Printf("[%s][>>Private to %s]: %s\n", timeString, parsedMessage.Recipient, decrypted)
 		case MessageTypes[6]: //error
-			fmt.Printf("[%s][ERROR]: %s", timeString, parsedMessage.Content)
+			fmt.Printf("[%s][ERROR]: %s\n", timeString, parsedMessage.Content)
 		case MessageTypes[7]: //public_key_of_client
 			contentToByte, _ := json.Marshal(parsedMessage.Content)
 			var parsedClient ClientInfo
 			_ = json.Unmarshal(contentToByte, &parsedClient)
-			userList[parsedClient.Username] = &parsedClient.PublicKey
+			if parsedClient.PublicKey == [32]byte{} {
+				publicKeyChannels[parsedClient.Username] <- struct{}{}
+				continue
+			}
+			setContact(parsedClient)
+			publicKeyChannels[parsedClient.Username] <- struct{}{}
 		}
 
 	}
@@ -119,15 +140,22 @@ func sendMessage(conn net.Conn) {
 				request, err = CreateRequest(Methods[0], message)
 			} else {
 				parts := strings.SplitN(data, " ", 2)
-				if len(parts) >= 2 {
+				if len(parts) >= 2 && len(strings.TrimSpace(parts[1])) > 0 && parts[0][1:] != clientName {
 					message.MessageType = MessageTypes[4]
 					message.Recipient = parts[0][1:]
-					message.Content = parts[1]
+					encryptedConntent, nonce := EncryptContent(parts[1], message.Recipient, conn)
+					message.Content = encryptedConntent
+					message.Nonce = nonce
 					request, err = CreateRequest(Methods[1], message)
+					if encryptedConntent == nil {
+						continue
+					}
+				} else {
+					log.Print("Invalid message. Make sure your message is not empty or you do not send message to yourself")
 				}
 			}
 			if err != nil {
-				log.Printf("Can not create JSON-rpc request to server. Error: %v", err)
+				log.Printf("Incorrect format of message. Error: %v", err)
 				return
 			}
 		}
@@ -148,37 +176,77 @@ func CreateRequest(method string, params interface{}) ([]byte, error) {
 	return marshaledRequest, err
 }
 
-//	func getPublicKey(username string, client net.Conn) {
-//		params := make(map[string]interface{})
-//		request, err := CreateRequest(Methods[3], params)
-//		if err != nil {
-//			log.Printf("Can not get public key from server. Error: %v", err)
-//		}
-//		return
-//	}
-func GenerateKeyPair() (*[32]byte, *[32]byte) {
-	publicKey, privateKey, err := box.GenerateKey(rand.Reader)
+func setContact(newContact ClientInfo) {
+	key := newContact.PublicKey
+	contactBook[newContact.Username] = &key
+}
+
+func getPublicKey(username string, conn net.Conn) {
+
+	params := RequestKey{
+		Target: username,
+		Sender: clientName,
+	}
+	request, err := CreateRequest(Methods[3], params) //get_public_key_of_client
+	if err != nil {
+		log.Printf("Can not get public key from server. Error: %v", err)
+		return
+	}
+	_, err = conn.Write(append(request, '\n'))
+
+	if err != nil {
+		log.Printf("Can not send request: %v", err)
+		return
+	}
+}
+func GenerateKeyPair() {
+	public, private, err := box.GenerateKey(rand.Reader)
 	if err != nil {
 		panic(err)
 	}
-	return publicKey, privateKey
+	privateKey = private
+	publicKey = public
 }
 
-func EncryptContent(message string, recipientPublicKey *[32]byte, senderPrivateKey *[32]byte) ([]byte, *[24]byte) {
+func EncryptContent(message string, recipient string, conn net.Conn) ([]byte, [24]byte) {
+	var recipientPublicKey *[32]byte
+	key, ok := contactBook[recipient]
+	if !ok {
+		getPublicKey(recipient, conn)
+		publicKeyChannels[recipient] = make(chan struct{})
+		<-publicKeyChannels[recipient]
+		recipientPublicKey, ok = contactBook[recipient]
+		if !ok {
+			return nil, [24]byte{}
+		}
+	} else {
+		recipientPublicKey = key
+	}
 	var nonce [24]byte
 	_, err := rand.Read(nonce[:])
 	if err != nil {
 		panic(err)
 	}
-
-	encrypted := box.Seal(nil, []byte(message), &nonce, recipientPublicKey, senderPrivateKey)
-	return encrypted, &nonce
+	encrypted := box.Seal(nil, []byte(message), &nonce, recipientPublicKey, (*[32]byte)(privateKey))
+	return encrypted, nonce
 }
 
-func DecryptContetnt(encrypted []byte, nonce *[24]byte, senderPublicKey *[32]byte, recipientPrivateKey *[32]byte) (string, error) {
-	decrypted, ok := box.Open(nil, encrypted, nonce, senderPublicKey, recipientPrivateKey)
+func DecryptContent(encrypted []byte, nonce *[24]byte, sender string, timeString string, conn net.Conn) {
+
+	senderPublicKey, ok := contactBook[sender]
 	if !ok {
-		return "", fmt.Errorf("decryption failed")
+		getPublicKey(sender, conn)
+		publicKeyChannels[sender] = make(chan struct{})
+		<-publicKeyChannels[sender]
+		senderPublicKey, ok = contactBook[sender]
+		if !ok {
+			return
+		}
 	}
-	return string(decrypted), nil
+	decrypted, ok := box.Open(nil, encrypted, nonce, senderPublicKey, privateKey)
+	if !ok {
+		fmt.Printf("[%s]not legitimate message. ALERT SCAMMER\n", timeString)
+		return
+	}
+	fmt.Printf("[%s][<<Private from %s]: %s\n", timeString, sender, decrypted)
 }

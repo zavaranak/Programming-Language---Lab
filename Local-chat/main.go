@@ -22,14 +22,19 @@ type Message struct {
 	Content     interface{} `json:"content"`
 	MessageType string      `json:"type"`
 	Timestamp   int64       `json:"timestamp"`
+	Nonce       [24]byte    `json:"nonce"`
 }
 
 type ClientInfo struct {
-	Username  string `json:"username"`
-	PublicKey []byte `json:"publicKey"`
+	Username  string   `json:"username"`
+	PublicKey [32]byte `json:"publicKey"`
+}
+type RequestKey struct {
+	Target string `json:"target"`
+	Sender string `json:"sender"`
 }
 
-var Methods = [44]string{"broadcast_message", "send_private_message", "provide_user_info", "get_public_key_of_client"}
+var Methods = [4]string{"broadcast_message", "send_private_message", "provide_user_info", "get_public_key_of_client"}
 var MessageTypes = [8]string{"client_online", "client_offline", "send_broadcast", "success_broadcast",
 	"send_private", "success_private", "error", "public_key_of_client"}
 var Results = [4]string{"success_send_broadcast", "success_send_private", "failure", "user_not_found"}

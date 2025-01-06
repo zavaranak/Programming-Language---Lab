@@ -110,7 +110,6 @@ func handleConnection(conn net.Conn) {
 			return
 		}
 		jsonRpcRequest = strings.TrimSpace(jsonRpcRequest)
-		log.Printf("New request from %s\n", clientInfo.Username)
 		go handleMessage(conn, jsonRpcRequest)
 	}
 }
@@ -148,7 +147,7 @@ func handleFirstRequest(conn net.Conn, data string) (net.Addr, error) {
 func handleMessage(conn net.Conn, jsonRpcRequest string) {
 	request, err := RequestParser([]byte(jsonRpcRequest))
 	if err != nil {
-		log.Printf("Error occured while parsing request from client: %v", err)
+		log.Printf("Incorrect request from client: %v", err)
 		return
 	}
 	var message Message
@@ -161,6 +160,7 @@ func handleMessage(conn net.Conn, jsonRpcRequest string) {
 		paramsToByte, _ := json.Marshal(params)
 		_ = json.Unmarshal(paramsToByte, &message)
 		message.Timestamp = time.Now().Unix()
+		log.Printf("[%s] broadcasted a message: %s", message.Sender, message.Content)
 		result = broadcastMessage(message)
 
 	case Methods[1]: //send_private_message)
@@ -172,21 +172,42 @@ func handleMessage(conn net.Conn, jsonRpcRequest string) {
 			result = Results[2]
 			break
 		}
+		log.Printf("[%s] send a private message to [%s]: %s\n", message.Sender, message.Recipient, message.Content)
 		result = sendMessageToClient(client.conn, message)
 
 	case Methods[3]: //get_public_key_of_client
-		clientsMutex.RLock()
+		var requestKey RequestKey
+		paramsToByte, _ := json.Marshal(params)
+		_ = json.Unmarshal(paramsToByte, &requestKey)
 
-		clientsMutex.RUnlock()
-		client := getClient(message.Recipient)
-		if client == nil {
-			result = Results[2]
-			break
+		log.Printf("[%s] requested PUBLIC KEY of [%s]\n", requestKey.Sender, requestKey.Target)
+
+		var content ClientInfo
+		content.Username = requestKey.Target
+		content.PublicKey = [32]byte{}
+		clientsMutex.RLock()
+		for _, client := range clients {
+			if client.clientInfo.Username == requestKey.Target {
+				content.PublicKey = client.clientInfo.PublicKey
+				message.Content = content
+				break
+			}
 		}
-		result = sendMessageToClient(client.conn, message)
+		clientsMutex.RUnlock()
+		if content.PublicKey == [32]byte{} {
+			result = Results[3]
+		}
+		message.Content = content
+		message.Sender = serverName
+		message.Timestamp = time.Now().Unix()
+		message.MessageType = MessageTypes[7]
+		message.Recipient = requestKey.Sender
+		sendMessageToClient(conn, message)
+
 	}
 
 	//Response
+	// var Results = [4]string{"success_send_broadcast", "success_send_private", "failure", "user_not_found"}
 	switch result {
 	case Results[0]:
 		message.MessageType = MessageTypes[3]
@@ -196,16 +217,17 @@ func handleMessage(conn net.Conn, jsonRpcRequest string) {
 		sendMessageToClient(conn, message)
 	case Results[2]:
 		var errorMessage Message
-		errorMessage.MessageType = MessageTypes[4]
+		errorMessage.MessageType = MessageTypes[6]
 		errorMessage.Content = ("Unable to send message")
 		errorMessage.Sender = serverName
 		sendMessageToClient(conn, errorMessage)
 	case Results[3]:
 		var errorMessage Message
-		errorMessage.MessageType = MessageTypes[4]
-		errorMessage.Content = "User " + message.Recipient + " not found"
+		errorMessage.MessageType = MessageTypes[6]
+		errorMessage.Content = "User not found"
 		errorMessage.Sender = serverName
 		errorMessage.Timestamp = time.Now().Unix()
+
 		sendMessageToClient(conn, errorMessage)
 	}
 
@@ -222,8 +244,6 @@ func getClient(username string) *Client {
 	return nil
 }
 func sendMessageToClient(client net.Conn, message Message) string {
-	clientsMutex.RLock()
-	defer clientsMutex.RUnlock()
 	marshaledMessage, err := json.Marshal(message)
 	if err != nil {
 		return Results[2]
