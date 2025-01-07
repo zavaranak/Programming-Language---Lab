@@ -5,28 +5,26 @@
 ###### Lab1 - Wget минимальный
 
 
-# REQUIRES:
-  ## ➕ Using asyn + sync primitives:
-    🟣 Using library asyncio (gather,run, sleep, async - await) ✅
-  ## ➕ Download file html:
-    🟣 Download with URL (provide in command line as an arguement) ✅
-    🟣 Save to current folder with original name. ✅
-  ## ➕ count taken bytes per second:
-    🟣 Every second gives output of size of taken data. ✅
-  ## ➕ Base language:
-    🟣 Using Python ✅
+# Требования:
+  ## ➕ Пользоваться asyn + sync примитивы:
+    🟣 Пользоваться Python asyncio (gather,run, sleep, async - await) ✅
+  ## ➕ Скачать файл (type: text/html + image + application):
+    🟣 Скачать с URL (указать в консоле) ✅
+    🟣 Сохранить в текущей папке с исходным именем (для html) и с уникальным именем для файла других типов. ✅
+  ## ➕ Вывод процесс каждую секунду:
+    🟣 Каждую секунду выдается информация о размере принятых данных. ✅
   ## ➕ Deadline:
     🟣 8 Jan 23:55 ✅
 
-# RECOMMENDATION:
-  ## 🟢 Using http.client (HTTPConnection,request, getResponse, close)✅
+# Рекомедация:
+  ## 🟢 Пользоваться http.client (HTTPConnection,request, getResponse, close)✅
 
-# RESULT:
+# Результат:
 ## Запустить программу с коммандой "python dang.py"
 ## Menu появится и предложит 2 варианта использования:
 ### 1) Ввести URL
-#### Если введенный URL правильный, то программа начнется скачание файл и сохранить с орининальным именем (title). При процессе скачания выводит через каждую секунду в концоле сообщение, сколько битов принятых в конкретное время. После процесса скачания программа вернется в MENU.
-##### URL правильный: response о сервера - 200 ОК, content-type: text/html. Правильная формата: "http" или "https" + "://" + domain + "/" +path
-##### Процесс скачание: (WHILE LOOP до того, когда будет буффер = 0, значит до конца response) читать response в буффер (размер 2MB) и записать буффер в файл (tempfile). Когда WHILE LOOP завершен, то есть tempfile записан, начнет поиск в нем title, переименовать файл полученным ответом от поиска.
+#### Если введенный URL правильный, то программа начнется скачание файл и сохранить с уникальным именем (uuid) или с орининальным именем (title) для html файла. При процессе скачания выводит через каждую секунду в концоле сообщение, сколько битов принятых в конкретное время. После процесса скачания программа вернется в MENU.
+##### URL правильный: response о сервера - 200 ОК. Правильная формата: "http" или "https" + "://" + domain + "/" +path
+##### Процесс скачание: (WHILE LOOP до того, когда будет буффер = 0, значит до конца response) читать response в буффер (размер 2MB) и записать буффер в файл (tempfile). Когда WHILE LOOP завершен, то есть tempfile записан, начнет поиск в нем title для text/html файлов или создает производные нмена из (uuid uuid4), переименовать файл полученным ответом от поиска.
 ##### Поиск title: regex(<title>(.?)</title>), полученый ответ будет проверен, чтобы удалить от него особые символы
 ### 2) Выйти - Ввести "q"

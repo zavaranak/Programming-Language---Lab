@@ -3,12 +3,14 @@ import asyncio
 import datetime
 import re
 import os
+import uuid
 
 total_bytes = 0
 download_finished = False
 filename = 'tempfile'
 
 def findTitle():
+    #for HTML file
     try:
         with open('tempfile', 'rb') as file:
             content = file.read()
@@ -60,7 +62,8 @@ async def download_file(url):
             [httpConnnection,path] = parsedURL
             httpConnnection.request("GET", path) 
             response = httpConnnection.getresponse()
-            if response.status == 200 and "text/html" in response.headers.get("Content-Type", ""):
+            contentType = response.headers.get("Content-Type")
+            if response.status == 200:
                 print("MESSAGE: Starting download...")
                 with open(filename, 'wb') as file:
                     original_name=None
@@ -74,10 +77,44 @@ async def download_file(url):
                             break  
                         file.write(buffer[:num_bytes_read])            
                         await asyncio.sleep(0)
-
                 
-                original_name = findTitle()
-                title = original_name +'.html'  if original_name else 'untitile.html'
+                extension = ''
+                title =''
+                if  "text/html" in contentType:
+                    extension=".html"
+                    original_name = findTitle()
+                    title = original_name + extension if original_name else  str(uuid.uuid4())+extension
+                elif "image" in contentType:
+                    if "jpeg" in contentType or "jpg" in contentType:
+                        extension = ".jpg"
+                    elif "png" in contentType:
+                        extension = ".png"
+                    elif "gif" in contentType:
+                        extension = ".gif"
+                    elif "bmp" in contentType:
+                        extension = ".bmp"
+                    elif "webp" in contentType:
+                        extension = ".webp"
+                    elif "svg+xml" in contentType:
+                        extension = ".svg"
+                    else:
+                        extension = ".img"  
+                    title = str(uuid.uuid4()) + extension  
+                elif "application" in contentType:
+                    if "pdf" in contentType:
+                        extension = ".pdf"
+                    elif "msword" in contentType or "vnd.openxmlformats-officedocument.wordprocessingml.document" in contentType:
+                            extension = ".docx"
+                    elif "vnd.ms-excel" in contentType or "vnd.openxmlformats-officedocument.spreadsheetml.sheet" in contentType:
+                            extension = ".xlsx"
+                    elif "vnd.ms-powerpoint" in contentType or "vnd.openxmlformats-officedocument.presentationml.presentation" in contentType:
+                        extension = ".pptx"
+                    elif "zip" in contentType:
+                        extension = ".zip"
+                    else:
+                        extension = ".doc" 
+                    title = str(uuid.uuid4()) + extension 
+
                 os.replace(filename, title)
                 print(f"MESSAGE: File downloaded successfully as '{title}', size: {total_bytes} bytes")
             else:
@@ -101,7 +138,7 @@ async def interface():
     print('>MENU:\n')
     quit = False
     while not quit:
-        command = input(">Enter the URL of website to download or Quit (q)\n>>> ")
+        command = input(">Enter the URL of file to download or Quit (q)\n>>> ")
         if command != 'q':
             await mainfunc(command)
             print(">RETURNING TO MENU:")
