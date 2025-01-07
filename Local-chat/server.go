@@ -102,15 +102,15 @@ func handleConnection(conn net.Conn) {
 	}()
 	// Listen to message from current connection (client) and pass it to handleMessage goroutine
 	for {
-		jsonRpcRequest, err := reader.ReadString('\n')
+		jsonRequest, err := reader.ReadString('\n')
 		if err != nil {
 			if err != io.EOF {
 				log.Printf("An error was occupied while reading request from %s: %v", clientInfo.Username, err)
 			}
 			return
 		}
-		jsonRpcRequest = strings.TrimSpace(jsonRpcRequest)
-		go handleMessage(conn, jsonRpcRequest)
+		jsonRequest = strings.TrimSpace(jsonRequest)
+		go handleMessage(conn, jsonRequest)
 	}
 }
 
