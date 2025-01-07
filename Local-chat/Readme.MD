@@ -24,10 +24,17 @@
         port (по умолчанию 8080) 
 
         --host --port (если не дано, то адрес будет по умолчанию 127.0.0.1:8080)
-    🟣 запуск сервера:  
-        go run main.go --mode server 
-    🟣 запуск клиента:
-        go run main.go --mode client --username xxxxx 
+            
+        🟡 реализация модуля для приложение:
+            go mod init local-chat (или другое имя)  
+        🟡 установить библиотеку криптогрфаии:
+            go get golang.org/x/crypto/nacl/box
+        🟡 обновить модуль:
+            go mod tidy
+        🟣 запуск сервера:  
+            go run . --mode server 
+        🟣 запуск клиента:
+            go run . --mode client --username xxxxx 
 
 ## ➕ Функции приложения:
     🟣[КЛИЕНТ] Отправить сообщение другому клиенту:
@@ -36,13 +43,17 @@
         - Ввести в формате: "message" (сообщение, не начинающее с символом "@")
     🟣[КЛИЕНТ] Получит сообщение о сервера или других клиентов (Вывести на консоле)
     🟣[СЕРВЕР] Принимает соединение и сохраняет клиента в формате MAP: 
-        MAP:
-            адрес (net.Addr) => клиент (Client)
 
-        Client (struct): {
-            conn (net.Conn)
-            username string
-        }
+            MAP:
+                адрес (net.Addr) => клиент (Client)
+
+            Client (struct): {
+                conn (net.Conn)
+                ClientInfo{
+                    Username  (string)  
+                    PublicKey ([32]byte)
+                }
+            }
 
 ## ➕ Deadline:
     🟣 8 Jan 23:55 
@@ -69,9 +80,9 @@
 
     🟪handleMessage(sender, message):
         -Эта функция проверяет, какой (Request.Method) клиент запросит из 3 методов:
-            - BROADCAST: Отправить всем сообщение. В этом случае, поле Params в Request содержает Message(Sender,ContentContent,Message_TypeType="send_broadcast")
-            - PRIVATE: Отправить определенному клиенту(Recipient) сообщение. В этом случае, поле Params в Request содержает Message(Sender,Recipient,ContentContent,Message_TypeType="send_private")
-            - REQUEST_PUBLIC_KEY: Запросит публичный ключ определенного клиента, сохранненый у сервера. Этот публичный ключ нужнен для асимметричного шифрования (Crypto_box/Nacl)
+            - Methods[0] // BROADCAST: Отправить всем сообщение. В этом случае, поле Params в Request содержает Message(Sender,ContentContent,Message_TypeType="send_broadcast")
+            - Methods[1] //PRIVATE: Отправить определенному клиенту(Recipient) сообщение. В этом случае, поле Params в Request содержает Message(Sender,Recipient,ContentContent,Message_TypeType="send_private")
+            - Methods[2] //REQUEST_PUBLIC_KEY: Запросит публичный ключ определенного клиента, сохранненый у сервера. Этот публичный ключ нужнен для асимметричного шифрования (Crypto_box/Nacl)
         -После упешного отправления сообщение, сервер отправляет тот же сообщение отправителю, чтобы утверждать, что сообщение передано другим.
         -Перед отправлением Message клиетам, сервер добавляет timestamp в Message. Таким образом сервер решает время сообщений, чтобы сообщения были синхронны для всех клиентов
             
