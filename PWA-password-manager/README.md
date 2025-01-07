@@ -6,7 +6,7 @@
 
 ## lab2 Мобильное приложение
 
-# REQUIRES:
+# Требования:
 
 ## ➕ Структура:
 
@@ -15,27 +15,27 @@
 
 ## ➕ Install WPA:
 
-    🟣 Button Install (will be hidden if app is installed, handled by beforeInstallPrompt Event) ✅
+    🟣 Кнопка установки (Button Install) (исчезает, если приложение уже было установлено - с помощью beforeInstallPrompt) ✅
     🟣 Run offline with caches ✅
 
-## ➕ Using storage:
+## ➕ Хранение:
 
     🟣 IndexedDB ✅
 
-## ➕ Data and operations:
+## ➕ Варианты использования:
 
-    🟣 Create Domain ✅
-    🟣 Delete Domain (with all profiles inside domain) ✅
-    🟣 Create Profile (with auto generated password) ✅
-    🟣 Edit Profile Password ✅
-    🟣 Show Info Profile Password (with old passwords before edited) ✅
-    🟣 Delete Profile ✅
+    🟣 Create Domain (создать новый домейн)✅
+    🟣 Delete Domain (удалить домейн вместе всех профилов внутри него) ✅
+    🟣 Create Profile (автоматически генерировать пароль) ✅
+    🟣 Edit Profile Password (изменить пароль для профила) ✅
+    🟣 Show Info Profile Password (Позазать текуший пароль и старые с датой) ✅
+    🟣 Delete Profile (удалить профил)✅
 
 ## ➕ Deadline:
 
     🟣 8 Jan 23:55 ✅
 
-# RESULT:
+# Результат:
 
 ## Запустить программу с коммандой "npx serve .", чтобы Service Worker смог работать, или просто открыть файл index.html на браузере (но будет без функции INSTALL)
 
